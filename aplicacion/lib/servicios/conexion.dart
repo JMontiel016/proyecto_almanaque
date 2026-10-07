@@ -1,4 +1,4 @@
-// Conexión confirmada: salud, sala asignada y detector preparado antes de capturar.
+// Conexión confirmada: salud, conexión y detector preparado antes de capturar.
 import 'dart:async'; // Espera de inicialización con tiempo límite.
 import 'dart:convert'; // Mensajes JSON pequeños.
 import 'dart:io'; // WebSocket Android.
@@ -10,7 +10,7 @@ class Conexion extends ChangeNotifier {
   StreamSubscription<dynamic>? suscripcion; // Escucha única.
   Map<String, dynamic> estado = {}; // Juego autoritativo.
   final vision = ValueNotifier<Map<String, dynamic>>({}); // Pose: no reconstruye toda la pantalla.
-  String identificador = '', sala = '', administrador = ''; // Identidad de sala.
+  String identificador = ''; // Identificador local.
   String mensaje = 'Comprobando servidor Python…', error = ''; // Estado visible.
   bool cuerpoListo = false, ocupado = false, conectado = false, detectorListo = false; // Fases separadas.
   DateTime envio = DateTime.now(); // Último cuadro enviado.
@@ -30,8 +30,8 @@ class Conexion extends ChangeNotifier {
     avisar();
   }
 
-  Future<void> abrir(String servidor, String nombre, String identidad, String codigo) async {
-    preparacion = Completer<void>(); // Nuevo intento de sala.
+  Future<void> abrir(String servidor) async {
+    preparacion = Completer<void>(); // Nuevo intento de conexión.
     final confirmado = preparacion!.future; // Instala espera antes de cualquier callback.
     unawaited(confirmado.catchError((Object _) {})); // Consume errores aun si la pantalla cierra durante preparación.
     try {
@@ -39,10 +39,10 @@ class Conexion extends ChangeNotifier {
       if (salud.statusCode != 200) throw StateError('Ese puerto no es el servidor Zunpi (/salud: HTTP ${salud.statusCode}).');
       final datos = jsonDecode(salud.body) as Map<String,dynamic>; // Datos de versión/modelo.
       if (datos['juego'] != 'Zunpi') throw StateError('La dirección pertenece a otro servicio.');
-      if (datos['version'] != '0.4.0') throw StateError('Actualizá y reiniciá el servidor Python con los archivos v0.4.');
+      if (datos['version'] != '0.5.0') throw StateError('Actualizá y reiniciá el servidor Python con los versión individual 0.5.0.');
       if (datos['modelo'] != true) throw StateError('Falta modelo corporal: ejecutá python descargar_modelo.py en la computadora.');
       if (cerrado) return; // Usuario ya salió.
-      mensaje = 'Servidor correcto. Creando o entrando a sala…';
+      mensaje = 'Servidor correcto. Conectando juego…';
       avisar();
       final direccion = Uri.parse(servidor); // Base validada.
       final destino = direccion.replace(scheme: direccion.scheme == 'https' ? 'wss' : 'ws', path: '/conexion', query: null); // Canal correcto.
@@ -63,10 +63,8 @@ class Conexion extends ChangeNotifier {
           switch (respuesta['tipo']) {
             case 'bienvenida':
               identificador = respuesta['identificador'] as String; // Identidad confirmada.
-              sala = respuesta['sala'] as String; // Código disponible antes de inferencia.
-              administrador = respuesta['administrador'] as String; // Botón de invitar visible de inmediato.
               conectado = true;
-              mensaje = 'Sala conectada. Preparando detector…';
+              mensaje = 'Juego conectado. Preparando detector…';
               break;
             case 'preparando':
               mensaje = respuesta['mensaje'] as String;
@@ -78,7 +76,6 @@ class Conexion extends ChangeNotifier {
               break;
             case 'estado':
               estado = respuesta; // Separa física de cámara.
-              administrador = respuesta['administrador'] as String; // Transferencia de rol.
               break;
             case 'vision':
               ocupado = false; // Siguiente cuadro.
@@ -105,7 +102,7 @@ class Conexion extends ChangeNotifier {
         conectado = detectorListo = false;
         if (!cerrado) fallar(error.isNotEmpty ? error : 'Servidor desconectado. Volvé al inicio y reconectá.');
       });
-      canal!.add(jsonEncode({'nombre':nombre,'identidad':identidad,'sala':codigo})); // Saludo después de escuchar.
+      canal!.add(jsonEncode({'nombre':'Jugador'})); // Saludo después de escuchar.
       await confirmado.timeout(const Duration(seconds: 35)); // Detector nunca espera infinito.
     } catch (problema) {
       // No completa con error sin consumidor: los errores previos al WebSocket se propagan directamente.

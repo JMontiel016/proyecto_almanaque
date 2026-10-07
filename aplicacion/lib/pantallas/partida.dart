@@ -4,25 +4,24 @@ import 'dart:math'; // Frecuencia adaptable a la latencia.
 import 'package:flutter/material.dart'; // Controles y lienzo.
 import 'package:flutter/services.dart'; // Orientación vertical del sensor.
 import 'package:camera/camera.dart'; // Preview y flujo de cuadros.
-import 'invitacion.dart'; // Única forma de invitar: QR propio.
 import '../servicios/conexion.dart'; // Red autoritativa Python.
 import '../servicios/conversor_camara.dart'; // Compresión fuera de la interfaz.
 import '../juego/escenario.dart'; // Animación independiente de cámara.
 
 class Partida extends StatefulWidget {
-  final String nombre, servidor, identidad, codigo;
-  const Partida({super.key, required this.nombre, required this.servidor, required this.identidad, required this.codigo});
+  final String servidor;
+  const Partida({super.key, required this.servidor});
   @override
   State<Partida> createState() => _EstadoPartida();
 }
 
 class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
-  final enlace = Conexion(); // Red de esta sala.
+  final enlace = Conexion(); // Conexión individual.
   final conversor = ConversorCamara(); // Un solo hilo para toda la sesión.
   CameraController? camara;
   List<CameraDescription> dispositivos = [];
   Future<void> operaciones = Future.value(); // Abrir, cerrar y cambiar nunca se superponen.
-  bool visible = true, convirtiendo = false, cambiando = false, invitando = false;
+  bool visible = true, convirtiendo = false, cambiando = false;
   bool preparado = false; // No reabre por el diálogo de permisos durante la primera carga.
   int seleccion = 0, generacion = 0;
   DateTime ultimoCuadro = DateTime.fromMillisecondsSinceEpoch(0);
@@ -37,7 +36,7 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
 
   Future<void> preparar() async {
     try {
-      await enlace.abrir(widget.servidor, widget.nombre, widget.identidad, widget.codigo);
+      await enlace.abrir(widget.servidor);
       if (!mounted) return;
       await conversor.iniciar();
       dispositivos = await availableCameras();
@@ -64,7 +63,7 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
         await anterior.dispose(); // Cierra antes de abrir otro sensor.
       }
       if (!mounted || !visible || turno != generacion || dispositivos.isEmpty) return;
-      final controlador = CameraController(dispositivos[seleccion], ResolutionPreset.high,
+      final controlador = CameraController(dispositivos[seleccion], ResolutionPreset.medium,
         enableAudio: false, imageFormatGroup: ImageFormatGroup.yuv420); // Solicita HD real según hardware.
       try {
         await controlador.initialize();
@@ -85,17 +84,17 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
   }
 
   Future<void> recibirCuadro(CameraImage cuadro, CameraController origen, int turno) async {
-    if (!mounted || !visible || invitando || convirtiendo || enlace.ocupado ||
+    if (!mounted || !visible || convirtiendo || enlace.ocupado ||
         !enlace.detectorListo || !enlace.conectado || !identical(camara, origen) || turno != generacion) { return; }
     final ahora = DateTime.now();
-    final intervalo = max(110, (enlace.demora * 1.1).round()).clamp(110, 400); // Máximo ~9/s; se adapta al servidor.
+    final intervalo = max(100, (enlace.demora * 1.05).round()).clamp(100, 500); // Máximo ~9/s; se adapta al servidor.
     if (ahora.difference(ultimoCuadro).inMilliseconds < intervalo) return;
     ultimoCuadro = ahora;
     convirtiendo = true; // Un cuadro en conversión y como máximo uno en red.
     try {
       final bytes = await conversor.convertir(cuadro, origen.description.sensorOrientation,
         origen.description.lensDirection == CameraLensDirection.front); // Android vertical bloqueado.
-      if (mounted && visible && turno == generacion && !invitando) enlace.enviarImagen(bytes);
+      if (mounted && visible && turno == generacion) enlace.enviarImagen(bytes);
     } catch (error) {
       if (mounted && turno == generacion) setState(() => errorCamara = '$error');
     } finally {
@@ -124,12 +123,6 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> compartir() async {
-    invitando = true; // Preview continúa; no gasta inferencia detrás del QR.
-    await showDialog<void>(context: context, builder: (_) => Invitacion(servidor: widget.servidor, sala: enlace.sala));
-    invitando = false;
-  }
-
   Widget panelCamara() => ValueListenableBuilder<Map<String, dynamic>>(
     valueListenable: enlace.vision,
     builder: (_, pose, __) => Column(children: [
@@ -148,7 +141,7 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
       const SizedBox(height: 6),
       Text(pose['mensaje'] as String? ?? enlace.mensaje, maxLines: 2, overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.center, style: TextStyle(color: pose['listo'] == true ? const Color(0xFFA7EF5B) : Colors.amber)),
-      Text('Vista HD · Python ${pose['demora'] ?? 0} ms · Calibración ${pose['calibracion'] ?? 0}/12',
+      Text('Vista en vivo · Python ${pose['demora'] ?? 0} ms · Calibración ${pose['calibracion'] ?? 0}/12',
         style: const TextStyle(fontSize: 11, color: Colors.white54)),
     ]),
   );
@@ -158,22 +151,18 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
     final jugadores = enlace.estado['jugadores'] as List? ?? [];
     Map? propio;
     for (final jugador in jugadores) { if (jugador['identificador'] == enlace.identificador) propio = jugador as Map; }
-    final administrador = enlace.identificador.isNotEmpty && enlace.administrador == enlace.identificador;
     final espera = ['espera', 'terminada'].contains(enlace.estado['estado']);
     return Scaffold(
       appBar: AppBar(title: const Text('Zunpi'), actions: [
-        if (administrador) IconButton(onPressed: espera ? compartir : null, icon: const Icon(Icons.qr_code_2), tooltip: 'Invitar por QR entre rondas'),
         IconButton(onPressed: cambiando || dispositivos.length < 2 ? null : cambiarCamara,
           icon: const Icon(Icons.cameraswitch_outlined), tooltip: 'Cambiar cámara frontal / trasera'),
       ]),
       body: SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 10), child: Column(children: [
-        Row(children: [Expanded(child: Text(widget.nombre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+        Row(children: [Expanded(child: Text('Juego individual', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
           Text('${propio?['puntos'] ?? 0}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFFA7EF5B))),
           const Text(' pts', style: TextStyle(color: Colors.white60))]),
         const SizedBox(height: 8),
         Expanded(flex: 4, child: RepaintBoundary(child: Escenario(estado: enlace.estado, propio: enlace.identificador))),
-        SizedBox(height: 32, child: ListView(scrollDirection: Axis.horizontal, children: jugadores.map<Widget>((j) => Padding(
-          padding: const EdgeInsets.only(right: 18), child: Center(child: Text('${j['nombre']} · ${j['puntos']}')))).toList())),
         Expanded(flex: 6, child: panelCamara()),
         if (errorCamara.isNotEmpty || enlace.error.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 4),
           child: Text(errorCamara.isNotEmpty ? errorCamara : enlace.error, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.amber))),
@@ -181,11 +170,9 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
           const Text('Python no responde. Volvé al inicio y comprobá el servidor.', style: TextStyle(color: Colors.amber)),
         const SizedBox(height: 8),
         ValueListenableBuilder<Map<String, dynamic>>(valueListenable: enlace.vision, builder: (_, pose, __) => Row(children: [
-          Expanded(child: FilledButton(onPressed: espera && enlace.conectado && (pose['listo'] == true || propio?['listo'] == true)
-            ? () => enlace.accion('listo') : null, child: Text(propio?['listo'] == true ? 'Listo ✓' : 'Estoy listo'))),
-          const SizedBox(width: 8),
-          if (administrador) Expanded(child: FilledButton.tonal(onPressed: espera && jugadores.isNotEmpty &&
-            jugadores.every((j) => j['listo'] == true && j['rastreado'] == true) ? () => enlace.accion('iniciar') : null, child: const Text('Jugar'))),
+          Expanded(child: FilledButton(onPressed: espera && enlace.conectado && pose['listo'] == true
+            ? () => enlace.accion('iniciar') : null,
+            child: Text(enlace.estado['estado'] == 'terminada' ? 'Volver a jugar' : 'Jugar'))),
           IconButton(onPressed: enlace.detectorListo ? () => enlace.accion('calibrar') : null,
             icon: const Icon(Icons.accessibility_new), tooltip: 'Volver a calibrar'),
         ])),
@@ -226,7 +213,7 @@ class Esqueleto extends CustomPainter {
       if ((puntos[par[0]][2] as num) > .45 && (puntos[par[1]][2] as num) > .45) canvas.drawLine(posicion(par[0]), posicion(par[1]), trazo);
     }
     trazo.color = const Color(0xFFFFC66B);
-    for (var i = 0; i < puntos.length; i++) { if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3, trazo); }
+    for (var i = 11; i < puntos.length; i++) { if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3, trazo); }
   }
   @override
   bool shouldRepaint(covariant Esqueleto anterior) => !identical(puntos, anterior.puntos);

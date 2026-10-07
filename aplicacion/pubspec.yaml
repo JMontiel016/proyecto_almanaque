@@ -1,8 +1,8 @@
 # Identificador técnico; el nombre visible es Zunpi.
 name: zunpi
-description: Dinosaurio multijugador con seguimiento corporal Python.
+description: Dinosaurio individual con salto y agachado corporal.
 publish_to: none
-version: 0.4.0+4
+version: 0.5.0+5
 environment:
   sdk: '>=3.6.0 <4.0.0'
 dependencies:
@@ -11,8 +11,6 @@ dependencies:
   camera: ^0.11.0 # Vista nativa HD y flujo de imágenes Android.
   image: ^4.5.4 # JPEG pequeño en un hilo Dart separado; sin detección corporal.
   shared_preferences: ^2.3.3 # Identidad y dirección del servidor.
-  qr_flutter: ^4.1.0 # QR de invitación.
-  mobile_scanner: ^7.0.0 # Lee invitaciones, no analiza el cuerpo.
   http: ^1.3.0 # Ranking y diagnóstico.
 dev_dependencies:
   flutter_test:

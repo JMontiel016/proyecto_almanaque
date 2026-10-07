@@ -77,8 +77,16 @@ class _Dibujo extends CustomPainter {
       final alto = (obstaculo['alto'] as num).toDouble() * escala; // Altura física.
       final ancho = (obstaculo['ancho'] as num).toDouble() * escala; // Ancho físico.
       final cactus = Paint()..color = const Color(0xFFFFC66B); // Obstáculos contrastantes.
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, suelo-alto, ancho, alto), const Radius.circular(3)), cactus); // Tallo.
-      canvas.drawRect(Rect.fromLTWH(x-ancho*.6, suelo-alto*.65, ancho*2.2, alto*.15), cactus); // Brazos del cactus.
+      if (obstaculo['tipo'] == 'aereo') {
+        final elevacion = ((obstaculo['y'] as num?)?.toDouble() ?? 38) * escala;
+        final centro = Offset(x + ancho / 2, suelo - elevacion - alto / 2);
+        canvas.drawOval(Rect.fromCenter(center: centro, width: ancho, height: alto), cactus);
+        final ala = sin(recorrido / 20) * alto;
+        canvas.drawLine(centro, centro + Offset(-ancho / 2, -alto - ala), cactus..strokeWidth = 3);
+      } else {
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, suelo-alto, ancho, alto), const Radius.circular(3)), cactus);
+        canvas.drawRect(Rect.fromLTWH(x-ancho*.6, suelo-alto*.65, ancho*2.2, alto*.15), cactus);
+      }
     }
     final jugadores = List<Map<String, dynamic>>.from((estado['jugadores'] as List? ?? []).map((j) => Map<String, dynamic>.from(j as Map))); // Tipos explícitos.
     final orden = [...jugadores.where((j) => j['identificador'] != propio), ...jugadores.where((j) => j['identificador'] == propio)]; // Propio se dibuja al final.
@@ -92,6 +100,14 @@ class _Dibujo extends CustomPainter {
       canvas.translate(120*escala, suelo-altura*escala); // Misma posición física de todos.
       canvas.scale(escala); // Dinosaurio adapta su tamaño.
       final dino = Paint()..color = vivo ? color : Colors.grey; // Muerto queda gris.
+      final agachado = jugador['agachado'] == true && altura == 0;
+      if (agachado) {
+        canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(0,-27,40,20), const Radius.circular(5)), dino);
+        canvas.drawRect(const Rect.fromLTWH(32,-30,23,18), dino);
+        canvas.drawRect(const Rect.fromLTWH(7,-10,8,10), dino);
+        canvas.drawRect(const Rect.fromLTWH(25,-10,8,10), dino);
+        canvas.drawRect(const Rect.fromLTWH(44,-26,4,4), Paint()..color = const Color(0xFF102018));
+      } else {
       canvas.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(4,-45,30,28), const Radius.circular(5)), dino); // Cuerpo.
       canvas.drawRect(const Rect.fromLTWH(25,-65,30,26), dino); // Cabeza.
       canvas.drawRect(const Rect.fromLTWH(22,-48,15,25), dino); // Cuello.
@@ -100,10 +116,11 @@ class _Dibujo extends CustomPainter {
       canvas.drawRect(Rect.fromLTWH(8,-20,8,20+paso), dino); // Pata izquierda.
       canvas.drawRect(Rect.fromLTWH(25,-20,8,20-paso), dino); // Pata derecha.
       canvas.drawRect(const Rect.fromLTWH(43,-60,5,5), Paint()..color = const Color(0xFF102018)); // Ojo.
+      }
       canvas.restore(); // Vuelve al panel.
       texto(canvas, jugador['nombre'] as String, Offset(10, 34 + indice*20), 12, vivo ? color : Colors.grey); // Nombres de rivales.
     }
-    texto(canvas, 'RONDA LOCAL', const Offset(12, 12), 12, Colors.white70); // Cabecera de escenario.
+    texto(canvas, 'JUEGO INDIVIDUAL', const Offset(12, 12), 12, Colors.white70); // Cabecera de escenario.
     if (estado['estado'] == 'cuenta') texto(canvas, '${(estado['cuenta'] as num).ceil()}', Offset(size.width*.48, size.height*.35), 48, Colors.white); // Cuenta común.
     if (estado['estado'] == 'espera' || estado.isEmpty) texto(canvas, 'Prepará tu cámara', Offset(size.width*.28, size.height*.5), 16, Colors.white70); // Espera.
     if (estado['pausada'] == true && estado['estado'] == 'jugando') texto(canvas, 'Pausa: falta un cuerpo visible', Offset(12, suelo-70), 14, Colors.amber); // Congelación explícita.
