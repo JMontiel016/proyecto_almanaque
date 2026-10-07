@@ -1,0 +1,7 @@
+# Servidor y WebSocket.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+# Detección corporal Python mediante API Tasks.
+mediapipe>=0.10.21,<0.11
+opencv-python-headless>=4.10,<5
+numpy>=1.26,<3
