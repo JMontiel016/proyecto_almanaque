@@ -19,9 +19,9 @@ from urllib.request import urlopen
 try:
     with urlopen('http://127.0.0.1:8001/salud',timeout=2) as respuesta:
         datos=json.load(respuesta)
-    if datos.get('juego')!='Zunpi' or datos.get('version')!='0.5.0':
-        raise RuntimeError('Reiniciá el servidor Python con los archivos v0.5.')
-    print('Servidor v0.5 disponible; modelo:',datos.get('modelo'))
+    if datos.get('juego')!='Zunpi' or datos.get('version')!='0.6.0':
+        raise RuntimeError('Reiniciá el servidor Python con los archivos v0.6.')
+    print('Servidor v0.6 disponible; modelo:',datos.get('modelo'))
 except Exception as error:
     raise SystemExit(f'Primero iniciá Python en el puerto 8001. Detalle: {error}')
 PY

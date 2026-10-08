@@ -25,6 +25,7 @@ class Juego:
     obstaculos: list = field(default_factory=list)  # Un mismo recorrido para todos.
     recorrido: float = 0.0  # Distancia acumulada para animar el terreno.
     siguiente: float = 700.0  # Distancia hasta generar otro obstáculo.
+    pausa_manual: bool = False
     pausada: bool = False  # Pausa compartida cuando falta seguimiento corporal.
     azar: random.Random = field(default_factory=random.Random)  # Generador del recorrido.
 
@@ -34,6 +35,7 @@ class Juego:
             raise ValueError('Ya hay una ronda en curso.')
         if not self.jugadores or not all(j.rastreado for j in self.jugadores.values()):
             raise ValueError('Calibrá primero con hombros y ambos pies visibles.')
+        self.pausa_manual = False
         self.estado, self.tiempo, self.cuenta = 'cuenta', 0.0, 3.0  # Reinicia el reloj.
         self.obstaculos, self.recorrido, self.siguiente = [], 0.0, 700.0  # Limpia recorrido.
         self.azar.seed(random.SystemRandom().randrange(2**32))  # Nueva ronda compartida.
@@ -53,7 +55,7 @@ class Juego:
         ahora = time.monotonic() if ahora is None else ahora  # Permite pruebas deterministas.
         dt = min(max(segundos, 0.0), 0.05)  # Limita saltos temporales del servidor.
         activos = [j for j in self.jugadores.values() if j.vivo and j.conectado]  # Participantes.
-        self.pausada = any(not j.rastreado or ahora - j.ultima_camara > 1.5 for j in activos)
+        self.pausada = self.pausa_manual or any(not j.rastreado or ahora - j.ultima_camara > 1.5 for j in activos)
         if self.estado not in ('cuenta', 'jugando') or self.pausada:
             return []  # Sin puntos gratis durante pausas o fuera de una ronda.
         if self.estado == 'cuenta':
@@ -99,7 +101,7 @@ class Juego:
     def publico(self):
         """Estado pequeño para dibujar el juego."""
         return {'tipo': 'estado',
-                'estado': self.estado, 'cuenta': max(0, self.cuenta), 'pausada': self.pausada,
+                'estado': self.estado, 'cuenta': max(0, self.cuenta), 'pausada': self.pausada, 'pausa_manual': self.pausa_manual,
                 'recorrido': self.recorrido, 'velocidad': min(1.5 ** min(int(self.tiempo * 25) // 500, 4), 4.0),
                 'obstaculos': self.obstaculos,
                 'jugadores': [{k:v for k,v in vars(j).items() if k not in ('identificador_privado','ultima_camara')} for j in self.jugadores.values()]}

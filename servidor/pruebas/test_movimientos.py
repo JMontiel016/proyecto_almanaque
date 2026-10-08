@@ -64,3 +64,19 @@ class Movimientos(unittest.TestCase):
         self.assertEqual(tipos,{'suelo','aereo'})
 
 if __name__=='__main__':unittest.main()
+
+class PausaManual(unittest.TestCase):
+    def test_pausa_no_avanza_y_continuar_retoma(self):
+        s=Juego();s.estado='jugando'
+        s.jugadores['a']=Jugador('a','QA',rastreado=True,ultima_camara=100)
+        s.pausa_manual=True
+        s.avanzar(.05,100)
+        self.assertTrue(s.pausada);self.assertEqual(s.tiempo,0)
+        self.assertTrue(s.publico()['pausa_manual'])
+        s.pausa_manual=False;s.avanzar(.05,100)
+        self.assertFalse(s.pausada);self.assertGreater(s.tiempo,0)
+    def test_continuar_no_ignora_cuerpo_perdido(self):
+        s=Juego();s.estado='jugando';s.pausa_manual=False
+        s.jugadores['a']=Jugador('a','QA',rastreado=False,ultima_camara=100)
+        s.avanzar(.05,100)
+        self.assertTrue(s.pausada);self.assertEqual(s.tiempo,0)

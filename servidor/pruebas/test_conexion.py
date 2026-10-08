@@ -37,7 +37,7 @@ class Conexion(unittest.IsolatedAsyncioTestCase):
         return m
     async def test_salud_individual(self):
         m=self.cargar();r=await m.salud()
-        self.assertEqual(r['version'],'0.5.0');self.assertEqual(r['modo'],'individual')
+        self.assertEqual(r['version'],'0.6.0');self.assertEqual(r['modo'],'individual')
     async def test_bienvenida_y_cierre_liberan_modelo(self):
         m=self.cargar();c=Canal();d=Detector()
         def crear():

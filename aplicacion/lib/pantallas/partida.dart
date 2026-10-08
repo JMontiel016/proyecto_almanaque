@@ -20,9 +20,12 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
   final conversor = ConversorCamara(); // Un solo hilo para toda la sesión.
   CameraController? camara;
   List<CameraDescription> dispositivos = [];
-  Future<void> operaciones = Future.value(); // Abrir, cerrar y cambiar nunca se superponen.
+  Future<void> operaciones =
+      Future.value(); // Abrir, cerrar y cambiar nunca se superponen.
   bool visible = true, convirtiendo = false, cambiando = false;
-  bool preparado = false; // No reabre por el diálogo de permisos durante la primera carga.
+  bool vistaNitida = false, mostrarPuntos = false;
+  bool preparado =
+      false; // No reabre por el diálogo de permisos durante la primera carga.
   int seleccion = 0, generacion = 0;
   DateTime ultimoCuadro = DateTime.fromMillisecondsSinceEpoch(0);
   String errorCamara = '';
@@ -41,7 +44,8 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
       await conversor.iniciar();
       dispositivos = await availableCameras();
       if (dispositivos.isEmpty) throw StateError('No hay cámara disponible.');
-      final frontal = dispositivos.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+      final frontal = dispositivos
+          .indexWhere((c) => c.lensDirection == CameraLensDirection.front);
       seleccion = frontal < 0 ? 0 : frontal;
       if (!mounted) return;
       await programarCamara();
@@ -62,15 +66,24 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
         if (anterior.value.isStreamingImages) await anterior.stopImageStream();
         await anterior.dispose(); // Cierra antes de abrir otro sensor.
       }
-      if (!mounted || !visible || turno != generacion || dispositivos.isEmpty) return;
-      final controlador = CameraController(dispositivos[seleccion], ResolutionPreset.medium,
-        enableAudio: false, imageFormatGroup: ImageFormatGroup.yuv420); // Solicita HD real según hardware.
+      if (!mounted || !visible || turno != generacion || dispositivos.isEmpty) {
+        return;
+      }
+      final controlador = CameraController(dispositivos[seleccion],
+          vistaNitida ? ResolutionPreset.high : ResolutionPreset.medium,
+          enableAudio: false,
+          imageFormatGroup:
+              ImageFormatGroup.yuv420); // Solicita HD real según hardware.
       try {
         await controlador.initialize();
         await controlador.lockCaptureOrientation(DeviceOrientation.portraitUp);
-        if (!mounted || !visible || turno != generacion) { await controlador.dispose(); return; }
+        if (!mounted || !visible || turno != generacion) {
+          await controlador.dispose();
+          return;
+        }
         camara = controlador;
-        await controlador.startImageStream((cuadro) => recibirCuadro(cuadro, controlador, turno));
+        await controlador.startImageStream(
+            (cuadro) => recibirCuadro(cuadro, controlador, turno));
         if (mounted) setState(() => errorCamara = '');
       } catch (error) {
         if (identical(camara, controlador)) camara = null;
@@ -78,25 +91,43 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
         rethrow;
       }
     }).catchError((Object error) {
-      if (mounted) setState(() => errorCamara = 'Cámara: $error. Revisá el permiso de cámara en Android.');
+      if (mounted) {
+        setState(() => errorCamara =
+            'Cámara: $error. Revisá el permiso de cámara en Android.');
+      }
     });
     return operaciones;
   }
 
-  Future<void> recibirCuadro(CameraImage cuadro, CameraController origen, int turno) async {
-    if (!mounted || !visible || convirtiendo || enlace.ocupado ||
-        !enlace.detectorListo || !enlace.conectado || !identical(camara, origen) || turno != generacion) { return; }
+  Future<void> recibirCuadro(
+      CameraImage cuadro, CameraController origen, int turno) async {
+    if (!mounted ||
+        !visible ||
+        convirtiendo ||
+        enlace.ocupado ||
+        !enlace.detectorListo ||
+        !enlace.conectado ||
+        !identical(camara, origen) ||
+        turno != generacion) {
+      return;
+    }
     final ahora = DateTime.now();
-    final intervalo = max(100, (enlace.demora * 1.05).round()).clamp(100, 500); // Máximo ~9/s; se adapta al servidor.
+    final intervalo = max(100, (enlace.demora * 1.05).round())
+        .clamp(100, 500); // Máximo ~9/s; se adapta al servidor.
     if (ahora.difference(ultimoCuadro).inMilliseconds < intervalo) return;
     ultimoCuadro = ahora;
     convirtiendo = true; // Un cuadro en conversión y como máximo uno en red.
     try {
-      final bytes = await conversor.convertir(cuadro, origen.description.sensorOrientation,
-        origen.description.lensDirection == CameraLensDirection.front); // Android vertical bloqueado.
+      final bytes = await conversor.convertir(
+          cuadro,
+          origen.description.sensorOrientation,
+          origen.description.lensDirection ==
+              CameraLensDirection.front); // Android vertical bloqueado.
       if (mounted && visible && turno == generacion) enlace.enviarImagen(bytes);
     } catch (error) {
-      if (mounted && turno == generacion) setState(() => errorCamara = '$error');
+      if (mounted && turno == generacion) {
+        setState(() => errorCamara = '$error');
+      }
     } finally {
       convirtiendo = false;
     }
@@ -106,7 +137,8 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
     if (cambiando || dispositivos.length < 2) return;
     setState(() => cambiando = true);
     seleccion = (seleccion + 1) % dispositivos.length;
-    enlace.accion('calibrar'); // La distancia corporal puede cambiar entre sensores.
+    enlace.accion(
+        'calibrar'); // La distancia corporal puede cambiar entre sensores.
     enlace.vision.value = {}; // No deja un esqueleto de la cámara anterior.
     await programarCamara();
     if (mounted) setState(() => cambiando = false);
@@ -114,7 +146,8 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState estado) {
-    if (estado == AppLifecycleState.inactive || estado == AppLifecycleState.paused) {
+    if (estado == AppLifecycleState.inactive ||
+        estado == AppLifecycleState.paused) {
       visible = false;
       programarCamara(); // Cierre en la misma cola que cualquier apertura pendiente.
     } else if (estado == AppLifecycleState.resumed) {
@@ -123,62 +156,231 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> ajustarVista() async {
+    await showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+            builder: (context, actualizar) => SafeArea(
+                    child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Vista de cámara',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold)),
+                    SwitchListTile(
+                        title: const Text('Vista nítida'),
+                        subtitle: const Text(
+                            'Más detalle en el celular. Desactivá si se vuelve lento.'),
+                        value: vistaNitida,
+                        onChanged: cambiando
+                            ? null
+                            : (valor) async {
+                                setState(() {
+                                  vistaNitida = valor;
+                                  cambiando = true;
+                                });
+                                actualizar(() {});
+                                enlace.accion('calibrar');
+                                enlace.vision.value = {};
+                                await programarCamara();
+                                if (mounted) setState(() => cambiando = false);
+                                if (context.mounted) actualizar(() {});
+                              }),
+                    SwitchListTile(
+                        title: const Text('Mostrar puntos del cuerpo'),
+                        subtitle: const Text(
+                            'Útil para revisar el seguimiento. No muestra la cara.'),
+                        value: mostrarPuntos,
+                        onChanged: (valor) {
+                          setState(() => mostrarPuntos = valor);
+                          actualizar(() {});
+                        }),
+                  ]),
+                ))));
+  }
+
   Widget panelCamara() => ValueListenableBuilder<Map<String, dynamic>>(
-    valueListenable: enlace.vision,
-    builder: (_, pose, __) => Column(children: [
-      Expanded(child: RepaintBoundary(child: ClipRRect(borderRadius: BorderRadius.circular(20), child: ColoredBox(
-        color: Colors.black,
-        child: camara?.value.isInitialized == true ? LayoutBuilder(builder: (_, limites) {
-          final proporcion = 1 / camara!.value.aspectRatio; // Sensor vertical sin estirar ni cortar pies.
-          final ancho = min(limites.maxWidth, limites.maxHeight * proporcion);
-          return Center(child: SizedBox(width: ancho, height: ancho / proporcion, child: Stack(fit: StackFit.expand, children: [
-            CameraPreview(camara!), // Textura nativa: no depende del tiempo de respuesta Python.
-            IgnorePointer(child: CustomPaint(painter: Esqueleto(pose['puntos'] as List? ?? []))),
-          ])));
-        }) : Center(child: Padding(padding: const EdgeInsets.all(20), child: Text(
-          errorCamara.isEmpty ? enlace.mensaje : errorCamara, textAlign: TextAlign.center))),
-      )))),
-      const SizedBox(height: 6),
-      Text(pose['mensaje'] as String? ?? enlace.mensaje, maxLines: 2, overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center, style: TextStyle(color: pose['listo'] == true ? const Color(0xFFA7EF5B) : Colors.amber)),
-      Text('Vista en vivo · Python ${pose['demora'] ?? 0} ms · Calibración ${pose['calibracion'] ?? 0}/12',
-        style: const TextStyle(fontSize: 11, color: Colors.white54)),
-    ]),
-  );
+        valueListenable: enlace.vision,
+        builder: (_, pose, __) => Column(children: [
+          Expanded(
+              child: RepaintBoundary(
+                  child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: ColoredBox(
+                        color: Colors.black,
+                        child: camara?.value.isInitialized == true
+                            ? LayoutBuilder(builder: (_, limites) {
+                                final proporcion = 1 /
+                                    camara!.value
+                                        .aspectRatio; // Sensor vertical sin estirar ni cortar pies.
+                                final ancho = min(limites.maxWidth,
+                                    limites.maxHeight * proporcion);
+                                return Center(
+                                    child: SizedBox(
+                                        width: ancho,
+                                        height: ancho / proporcion,
+                                        child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              CameraPreview(
+                                                  camara!), // Textura nativa: no depende del tiempo de respuesta Python.
+                                              if (mostrarPuntos)
+                                                IgnorePointer(
+                                                    child: CustomPaint(
+                                                        painter: Esqueleto(
+                                                            pose['puntos']
+                                                                    as List? ??
+                                                                []))),
+                                            ])));
+                              })
+                            : Center(
+                                child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Text(
+                                        errorCamara.isEmpty
+                                            ? enlace.mensaje
+                                            : errorCamara,
+                                        textAlign: TextAlign.center))),
+                      )))),
+          const SizedBox(height: 6),
+          Text(pose['mensaje'] as String? ?? enlace.mensaje,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: pose['listo'] == true
+                      ? const Color(0xFFA7EF5B)
+                      : Colors.amber)),
+          if (pose['listo'] != true)
+            Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: LinearProgressIndicator(
+                    value:
+                        ((pose['calibracion'] as num?) ?? 0).clamp(0, 12) / 12,
+                    borderRadius: BorderRadius.circular(6),
+                    minHeight: 5)),
+          Text(
+              '${vistaNitida ? 'Vista nítida' : 'Vista fluida'} · Respuesta ${pose['demora'] ?? 0} ms',
+              style: const TextStyle(fontSize: 11, color: Colors.white54)),
+        ]),
+      );
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(animation: enlace, builder: (_, __) {
-    final jugadores = enlace.estado['jugadores'] as List? ?? [];
-    Map? propio;
-    for (final jugador in jugadores) { if (jugador['identificador'] == enlace.identificador) propio = jugador as Map; }
-    final espera = ['espera', 'terminada'].contains(enlace.estado['estado']);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Zunpi'), actions: [
-        IconButton(onPressed: cambiando || dispositivos.length < 2 ? null : cambiarCamara,
-          icon: const Icon(Icons.cameraswitch_outlined), tooltip: 'Cambiar cámara frontal / trasera'),
-      ]),
-      body: SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 10), child: Column(children: [
-        Row(children: [Expanded(child: Text('Juego individual', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-          Text('${propio?['puntos'] ?? 0}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFFA7EF5B))),
-          const Text(' pts', style: TextStyle(color: Colors.white60))]),
-        const SizedBox(height: 8),
-        Expanded(flex: 4, child: RepaintBoundary(child: Escenario(estado: enlace.estado, propio: enlace.identificador))),
-        Expanded(flex: 6, child: panelCamara()),
-        if (errorCamara.isNotEmpty || enlace.error.isNotEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(errorCamara.isNotEmpty ? errorCamara : enlace.error, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.amber))),
-        if (enlace.ocupado && DateTime.now().difference(enlace.envio).inSeconds > 5)
-          const Text('Python no responde. Volvé al inicio y comprobá el servidor.', style: TextStyle(color: Colors.amber)),
-        const SizedBox(height: 8),
-        ValueListenableBuilder<Map<String, dynamic>>(valueListenable: enlace.vision, builder: (_, pose, __) => Row(children: [
-          Expanded(child: FilledButton(onPressed: espera && enlace.conectado && pose['listo'] == true
-            ? () => enlace.accion('iniciar') : null,
-            child: Text(enlace.estado['estado'] == 'terminada' ? 'Volver a jugar' : 'Jugar'))),
-          IconButton(onPressed: enlace.detectorListo ? () => enlace.accion('calibrar') : null,
-            icon: const Icon(Icons.accessibility_new), tooltip: 'Volver a calibrar'),
-        ])),
-      ]))),
-    );
-  });
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: enlace,
+      builder: (_, __) {
+        final jugadores = enlace.estado['jugadores'] as List? ?? [];
+        Map? propio;
+        for (final jugador in jugadores) {
+          if (jugador['identificador'] == enlace.identificador) {
+            propio = jugador as Map;
+          }
+        }
+        final espera =
+            ['espera', 'terminada'].contains(enlace.estado['estado']);
+        return Scaffold(
+          appBar: AppBar(title: const Text('Zunpi'), actions: [
+            if (['cuenta', 'jugando'].contains(enlace.estado['estado']))
+              IconButton(
+                  onPressed:
+                      enlace.conectado ? () => enlace.accion('pausar') : null,
+                  icon: Icon(enlace.estado['pausa_manual'] == true
+                      ? Icons.play_arrow_rounded
+                      : Icons.pause_rounded),
+                  tooltip: enlace.estado['pausa_manual'] == true
+                      ? 'Continuar'
+                      : 'Pausar'),
+            IconButton(
+                onPressed: ajustarVista,
+                icon: const Icon(Icons.tune_rounded),
+                tooltip: 'Ajustar vista'),
+            IconButton(
+                onPressed:
+                    cambiando || dispositivos.length < 2 ? null : cambiarCamara,
+                icon: const Icon(Icons.cameraswitch_outlined),
+                tooltip: 'Cambiar cámara frontal / trasera'),
+          ]),
+          body: SafeArea(
+              child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                  child: Column(children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text('Juego individual',
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w700))),
+                      Text('${propio?['puntos'] ?? 0}',
+                          style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFA7EF5B))),
+                      const Text(' pts',
+                          style: TextStyle(color: Colors.white60))
+                    ]),
+                    const SizedBox(height: 8),
+                    const Row(children: [
+                      Icon(Icons.arrow_upward_rounded,
+                          size: 18, color: Color(0xFFA7EF5B)),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: Text('Cactus: saltá',
+                              style: TextStyle(fontSize: 12))),
+                      Icon(Icons.arrow_downward_rounded,
+                          size: 18, color: Color(0xFFFFCF7F)),
+                      SizedBox(width: 4),
+                      Expanded(
+                          child: Text('Aves: agachate',
+                              style: TextStyle(fontSize: 12))),
+                    ]),
+                    const SizedBox(height: 8),
+                    Expanded(
+                        flex: 5,
+                        child: RepaintBoundary(
+                            child: Escenario(
+                                estado: enlace.estado,
+                                propio: enlace.identificador))),
+                    const SizedBox(height: 12),
+                    Expanded(flex: 5, child: panelCamara()),
+                    if (errorCamara.isNotEmpty || enlace.error.isNotEmpty)
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                              errorCamara.isNotEmpty
+                                  ? errorCamara
+                                  : enlace.error,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.amber))),
+                    if (enlace.ocupado &&
+                        DateTime.now().difference(enlace.envio).inSeconds > 5)
+                      const Text(
+                          'Python no responde. Volvé al inicio y comprobá el servidor.',
+                          style: TextStyle(color: Colors.amber)),
+                    const SizedBox(height: 8),
+                    ValueListenableBuilder<Map<String, dynamic>>(
+                        valueListenable: enlace.vision,
+                        builder: (_, pose, __) => Row(children: [
+                              Expanded(
+                                  child: FilledButton(
+                                      onPressed: espera &&
+                                              enlace.conectado &&
+                                              pose['listo'] == true
+                                          ? () => enlace.accion('iniciar')
+                                          : null,
+                                      child: Text(
+                                          enlace.estado['estado'] == 'terminada'
+                                              ? 'Volver a jugar'
+                                              : 'Jugar'))),
+                              IconButton(
+                                  onPressed: enlace.detectorListo
+                                      ? () => enlace.accion('calibrar')
+                                      : null,
+                                  icon: const Icon(Icons.accessibility_new),
+                                  tooltip: 'Volver a calibrar'),
+                            ])),
+                  ]))),
+        );
+      });
 
   @override
   void dispose() {
@@ -189,7 +391,8 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
     enlace.dispose();
     // Espera la operación ya iniciada: no cierra el hardware durante initialize.
     unawaited(operaciones.then((_) async {
-      final anterior = camara; camara = null;
+      final anterior = camara;
+      camara = null;
       if (anterior != null) {
         if (anterior.value.isStreamingImages) await anterior.stopImageStream();
         await anterior.dispose();
@@ -202,19 +405,43 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
 class Esqueleto extends CustomPainter {
   final List puntos; // Coordenadas normalizadas inferidas por Python.
   Esqueleto(this.puntos);
-  static const uniones = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],
-    [23,24],[23,25],[25,27],[24,26],[26,28],[27,31],[28,32]];
+  static const uniones = [
+    [11, 12],
+    [11, 13],
+    [13, 15],
+    [12, 14],
+    [14, 16],
+    [11, 23],
+    [12, 24],
+    [23, 24],
+    [23, 25],
+    [25, 27],
+    [24, 26],
+    [26, 28],
+    [27, 31],
+    [28, 32]
+  ];
   @override
   void paint(Canvas canvas, Size size) {
     if (puntos.length != 33) return;
-    Offset posicion(int i) => Offset((puntos[i][0] as num).toDouble() * size.width, (puntos[i][1] as num).toDouble() * size.height);
-    final trazo = Paint()..color = const Color(0xFFA7EF5B)..strokeWidth = 2.5;
+    Offset posicion(int i) => Offset(
+        (puntos[i][0] as num).toDouble() * size.width,
+        (puntos[i][1] as num).toDouble() * size.height);
+    final trazo = Paint()
+      ..color = const Color(0xFFA7EF5B)
+      ..strokeWidth = 2.5;
     for (final par in uniones) {
-      if ((puntos[par[0]][2] as num) > .45 && (puntos[par[1]][2] as num) > .45) canvas.drawLine(posicion(par[0]), posicion(par[1]), trazo);
+      if ((puntos[par[0]][2] as num) > .45 && (puntos[par[1]][2] as num) > .45) {
+        canvas.drawLine(posicion(par[0]), posicion(par[1]), trazo);
+      }
     }
     trazo.color = const Color(0xFFFFC66B);
-    for (var i = 11; i < puntos.length; i++) { if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3, trazo); }
+    for (var i = 11; i < puntos.length; i++) {
+      if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3, trazo);
+    }
   }
+
   @override
-  bool shouldRepaint(covariant Esqueleto anterior) => !identical(puntos, anterior.puntos);
+  bool shouldRepaint(covariant Esqueleto anterior) =>
+      !identical(puntos, anterior.puntos);
 }

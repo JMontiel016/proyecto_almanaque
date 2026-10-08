@@ -60,8 +60,8 @@ class _EstadoInicio extends State<Inicio> {
         throw StateError('El servidor no respondió correctamente.');
       }
       final datos = jsonDecode(respuesta.body) as Map<String, dynamic>;
-      if (datos['juego'] != 'Zunpi' || datos['version'] != '0.5.0') {
-        throw StateError('Reiniciá Python con la versión individual 0.5.0.');
+      if (datos['juego'] != 'Zunpi' || datos['version'] != '0.6.0') {
+        throw StateError('Reiniciá Python con la versión individual 0.6.0.');
       }
       if (datos['modelo'] != true) {
         throw StateError('Ejecutá descargar_modelo.py en la carpeta servidor.');

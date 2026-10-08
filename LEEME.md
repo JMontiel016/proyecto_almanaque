@@ -1,8 +1,40 @@
-# Zunpi individual
+# Zunpi 0.6 · Saltá y agachate
 
 Juego Android con Flutter: saltá los cactus y agachate ante las aves.
 La cámara del celular envía JPEG de hasta 480 px a Python, que ejecuta
 MediaPipe Pose Lite. No hay QR, salas, ranking ni conexión ESP32.
+
+## Actualizar un proyecto anterior
+
+Detener Python y Flutter con Ctrl+C. Extraer el ZIP en una carpeta aparte.
+Desde la raíz del proyecto anterior:
+
+```bash
+python3 /RUTA/Zunpi_mejorado/instalar_actualizacion.py
+```
+
+El instalador crea respaldo y retira el archivo QR antiguo que puede quedar al
+copiar carpetas encima. No borra el entorno Python, el modelo ni los datos locales.
+No hace falta ejecutar preparar_android.sh si ya ejecutabas la versión anterior.
+Reiniciar Python y ejecutar `bash probar_android_usb.sh` en otra terminal.
+La versión nueva exige servidor 0.6.0 para que el botón Pausar funcione.
+
+## Vista y controles
+
+Dinosaurio, cactus y aves se dibujan como curvas vectoriales con suavizado,
+sin sprites pixelados ni paquetes gráficos adicionales. La vista del mundo está
+más cerca para ver mejor los obstáculos. La física y las colisiones siguen en Python.
+No se cambió la frecuencia del servidor ni se aumentó el tamaño JPEG para detección.
+
+- Cactus: saltá. Aves: agachate.
+- Pausar/Continuar: detiene recorrido y puntaje. Con cuerpo perdido sigue pausado.
+- Ajustar vista: cámara Fluida por defecto; Nítida para más detalle si el celular lo permite.
+- Mostrar puntos: opcional para diagnóstico; sin cara, ocultos por defecto.
+- Calibración: barra de 12 muestras, permanecé de pie y quieto.
+- Cuenta regresiva y mensajes de pausa/fin visibles sobre el juego.
+
+La vista Nítida aumenta el trabajo de cámara/copia en el celular; si hay trabas,
+volver a Fluida. El procesador recibe JPEG de hasta 480 px en ambos modos.
 
 ## Preparar Python en Linux
 

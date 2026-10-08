@@ -1,14 +1,14 @@
 # Verificación de la versión individual
 
-- 40 pruebas Python aprobadas: calibración, salto, aterrizaje, agachado,
+- 42 pruebas Python aprobadas: calibración, salto, aterrizaje, agachado,
   histéresis, ruido, pies alternados, cara oculta, marcas temporales VIDEO,
   colisiones cactus/aves, conexión y rechazo de una segunda cámara.
 - Compilación sintáctica Python y sintaxis de scripts Bash correctas.
 - Dart: los 8 archivos de código/pruebas se pudieron analizar sintácticamente
   con `dart format --output=none`.
 - `flutter analyze --no-pub`: sin problemas.
-- `flutter test --no-pub`: 6 pruebas aprobadas, incluyendo conversión JPEG,
-  rotación, stride, inicio individual sin QR y selección Wi-Fi.
+- `flutter test --no-pub`: 11 pruebas aprobadas, incluyendo conversión JPEG,
+  rotación, stride, inicio individual sin QR y selección Wi-Fi, pantallas de espera/cuenta/pausa/fin y dibujo en 3 tamaños.
 - Dependencias resueltas y lockfile regenerado sin QR/scanner.
 - SDK de validación: Flutter 3.47.6 / Dart 3.13.5.
 
@@ -23,3 +23,7 @@ El historial Git aún contiene los archivos antiguos de venv; eliminarlo de
 la rama no reduce por sí solo el tamaño de un clon con todo el historial.
 Se recomienda `git clone --depth 1 --branch simplificar-juego-individual URL`
 para probar esta versión sin descargar el historial anterior.
+
+Versión visual 0.6: captura renderizada del juego revisada manualmente.
+No se midió el rendimiento de la cámara nítida en un celular físico.
+El instalador conserva respaldo de los archivos modificados y retira el QR antiguo.

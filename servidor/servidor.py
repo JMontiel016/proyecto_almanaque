@@ -9,7 +9,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from buzon import Buzon
 from motor import Juego, Jugador
 
-VERSION = '0.5.0'
+VERSION = '0.6.0'
 app = FastAPI(title='Zunpi individual')
 # Una cámara activa evita multiplicar modelos y competir por CPU.
 ocupado = False
@@ -88,6 +88,10 @@ async def conectar(websocket: WebSocket):
                 try:
                     if mensaje.get('accion') == 'iniciar':
                         juego.comenzar()
+                    elif mensaje.get('accion') == 'pausar':
+                        if juego.estado not in ('cuenta', 'jugando'):
+                            raise ValueError('La partida no está en curso.')
+                        juego.pausa_manual = not juego.pausa_manual
                     elif mensaje.get('accion') == 'calibrar':
                         detector.salto.reiniciar()
                         jugador.rastreado = jugador.agachado = False

@@ -39,7 +39,7 @@ class Conexion extends ChangeNotifier {
       if (salud.statusCode != 200) throw StateError('Ese puerto no es el servidor Zunpi (/salud: HTTP ${salud.statusCode}).');
       final datos = jsonDecode(salud.body) as Map<String,dynamic>; // Datos de versión/modelo.
       if (datos['juego'] != 'Zunpi') throw StateError('La dirección pertenece a otro servicio.');
-      if (datos['version'] != '0.5.0') throw StateError('Actualizá y reiniciá el servidor Python con los versión individual 0.5.0.');
+      if (datos['version'] != '0.6.0') throw StateError('Actualizá y reiniciá el servidor Python con los versión individual 0.6.0.');
       if (datos['modelo'] != true) throw StateError('Falta modelo corporal: ejecutá python descargar_modelo.py en la computadora.');
       if (cerrado) return; // Usuario ya salió.
       mensaje = 'Servidor correcto. Conectando juego…';
