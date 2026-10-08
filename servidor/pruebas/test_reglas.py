@@ -1,24 +1,20 @@
 """Pruebas reales de reglas, detección geométrica y persistencia, sin cámara ni SDK."""
-import os  # Directorio temporal de base.
 import sys  # Importa servidor desde carpeta de pruebas.
 from pathlib import Path  # Rutas portables.
-import tempfile  # Aísla ranking de datos reales.
 import unittest  # Biblioteca estándar; no requiere pip.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # Módulos del proyecto.
-from motor import Sala, Jugador  # Física autoritativa.
+from motor import Juego, Jugador  # Física autoritativa.
 from detector_salto import DetectorSalto  # Geometría corporal.
 
 class PruebasMotor(unittest.TestCase):
     def setUp(self):
-        self.sala = Sala('ABC123','a')  # Sala de prueba.
-        self.jugador = Jugador('a','Jaime',listo=True,rastreado=True,ultima_camara=100)  # Pose vigente.
+        self.sala = Juego()  # Sala de prueba.
+        self.jugador = Jugador('a','Jaime',rastreado=True,ultima_camara=100)  # Pose vigente.
         self.jugador.identificador_privado = 'secreto-del-dispositivo'  # No debe salir por red.
         self.sala.jugadores['a'] = self.jugador
-    def test_solo_administrador(self):
-        with self.assertRaises(ValueError): self.sala.comenzar('otro')  # Control de rol.
     def test_requiere_cuerpo_y_listo(self):
         self.jugador.rastreado = False  # Cámara perdida.
-        with self.assertRaises(ValueError): self.sala.comenzar('a')
+        with self.assertRaises(ValueError): self.sala.comenzar()
     def test_un_choque_termina_vida(self):
         self.sala.estado = 'jugando'  # Física activa.
         self.sala.obstaculos = [{'x':145,'alto':50,'ancho':26}]  # Cactus en dinosaurio.
@@ -52,14 +48,6 @@ class PruebasMotor(unittest.TestCase):
         self.assertAlmostEqual(self.sala.recorrido,220*1.5*.02)
     def test_identidad_privada_no_se_publica(self):
         self.assertNotIn('identificador_privado',self.sala.publico()['jugadores'][0])
-    def test_todos_ven_mismo_obstaculo(self):
-        self.sala.jugadores['b'] = Jugador('b','Ana',rastreado=True,ultima_camara=100)
-        self.sala.estado = 'jugando'
-        self.sala.siguiente = 0  # Genera cactus único compartido.
-        self.sala.avanzar(.02,100)
-        self.assertEqual(len(self.sala.obstaculos),1)
-        self.assertEqual(self.jugador.puntos,self.sala.jugadores['b'].puntos)
-
 class PruebasSalto(unittest.TestCase):
     def setUp(self):
         self.detector = DetectorSalto()
@@ -82,19 +70,4 @@ class PruebasSalto(unittest.TestCase):
         self.assertFalse(self.detector.evaluar(.42,.83,.83,.8,20)[0])
         self.assertIsNone(self.detector.base)
 
-class PruebasRanking(unittest.TestCase):
-    def test_persistencia_y_mejor_marca(self):
-        import almacenamiento  # Módulo sin dependencias de inferencia.
-        with tempfile.TemporaryDirectory() as carpeta:
-            anterior = almacenamiento.RUTA
-            almacenamiento.RUTA = Path(carpeta)  # Base aislada.
-            try:
-                almacenamiento.registrar('a','Jaime Ñ',600)
-                almacenamiento.registrar('a','Jaime Ñ',200)  # Récord no disminuye.
-                almacenamiento.registrar('b','Ana',700)
-                self.assertEqual(almacenamiento.ranking(),[{'nombre':'Ana','puntos':700},{'nombre':'Jaime Ñ','puntos':600}])
-            finally:
-                almacenamiento.RUTA = anterior
-
-if __name__ == '__main__':
-    unittest.main()  # Resultado explícito.
+if __name__ == '__main__': unittest.main()

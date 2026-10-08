@@ -38,7 +38,7 @@ class ImagenSimulada:
     shape = (480, 270, 3)
 class ModeloSimulado:
     def __init__(self, puntos): self.puntos = puntos
-    def detect(self, imagen): return types.SimpleNamespace(pose_landmarks=self.puntos)
+    def detect_for_video(self, imagen, marca): return types.SimpleNamespace(pose_landmarks=self.puntos)
 
 class PruebasPose(unittest.TestCase):
     def cargar(self):
@@ -56,6 +56,7 @@ class PruebasPose(unittest.TestCase):
         with patch.dict(sys.modules, {'cv2':cv,'numpy':np,'mediapipe':mp}): spec.loader.exec_module(modulo)
         detector = modulo.Seguimiento.__new__(modulo.Seguimiento)
         detector.salto = DetectorSalto()
+        detector.ultimo_ms = -1
         return detector
     def puntos(self):
         puntos = [types.SimpleNamespace(x=.5,y=.4,visibility=.95) for _ in range(33)]
@@ -69,11 +70,31 @@ class PruebasPose(unittest.TestCase):
         with patch('time.monotonic', side_effect=[1+i*.13 for i in range(12)]):
             for _ in range(12): salida = detector.procesar(b'jpeg_simulado')
         self.assertTrue(salida['listo'])
-        self.assertEqual(salida['puntos'][0][0], .2)
+        self.assertEqual(salida['puntos'][0], [0,0,0])
         self.assertEqual(len(salida['puntos']),33)
         self.assertNotIn('imagen', salida)
+    def test_cara_oculta_no_bloquea_calibracion(self):
+        detector = self.cargar(); puntos = self.puntos()
+        for i in range(11): puntos[i].visibility = 0; puntos[i].y = -1
+        detector.modelo = ModeloSimulado([puntos])
+        with patch('time.monotonic', side_effect=[1+i*.13 for i in range(12)]):
+            for _ in range(12): salida = detector.procesar(b'jpeg_simulado')
+        self.assertTrue(salida['listo'])
+        self.assertEqual(salida['puntos'][:11], [[0,0,0]]*11)
+
+    def test_tracking_marcas_estrictamente_crecientes(self):
+        detector = self.cargar(); marcas = []
+        class Modelo:
+            def detect_for_video(self, imagen, marca):
+                marcas.append(marca)
+                return types.SimpleNamespace(pose_landmarks=[])
+        detector.modelo = Modelo()
+        with patch('time.monotonic', return_value=1):
+            for _ in range(3): detector.procesar(b'jpeg_simulado')
+        self.assertEqual(marcas, [1000,1001,1002])
+
     def test_falta_pie_no_habilita_juego(self):
-        detector = self.cargar(); puntos = self.puntos(); puntos[32].visibility=.1
+        detector = self.cargar(); puntos = self.puntos(); puntos[28].visibility=.1
         detector.modelo = ModeloSimulado([puntos])
         salida = detector.procesar(b'jpeg_simulado')
         self.assertFalse(salida['listo']); self.assertIn('pies',salida['mensaje'])
