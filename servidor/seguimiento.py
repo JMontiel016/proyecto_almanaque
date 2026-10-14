@@ -64,6 +64,8 @@ class Seguimiento:
                 else:
                     valido = False
                     mensaje = 'Alejate: necesito ver cabeza y tobillos completos'
+        if not valido:
+            self.salto.perdida(time.monotonic())  # No reutiliza calibración después de perder el seguimiento.
         listo = valido and self.salto.base is not None  # La partida espera calibración completa.
         # Retorna coordenadas pequeñas: nunca recodifica ni devuelve video HD.
         articulaciones = []
