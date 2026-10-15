@@ -1,0 +1,31 @@
+name: QA Zunpi
+on:
+  push:
+    branches: [optimizar-zunpi-qa]
+  pull_request:
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pruebas unitarias del salto
+        run: python -m unittest discover -s servidor/pruebas -p test_optimizacion_pose.py -v
+  flutter-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Dependencias
+        run: flutter pub get
+        working-directory: aplicacion
+      - name: Analisis
+        run: flutter analyze
+        working-directory: aplicacion
+      - name: Pruebas
+        run: flutter test
+        working-directory: aplicacion

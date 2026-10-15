@@ -49,17 +49,23 @@ class Seguimiento:
         valido, salto, mensaje = False, False, 'Alejate: mostra cabeza, manos y ambos pies'  # Estado inicial.
         if resultado.pose_landmarks:
             puntos = resultado.pose_landmarks[0]  # Persona principal.
-            necesarios = [0,11,12,23,24,25,26,27,28,31,32]  # Cuerpo completo.
+            necesarios = [0,11,12,23,24,25,26,27,28]  # Cabeza, tronco y tobillos; dedos del pie no son obligatorios.
             valido = all((puntos[i].visibility or 0) > .45 and .005 < puntos[i].x < .995 and .005 < puntos[i].y < .995 for i in necesarios)
             if not valido:
                 faltantes = []  # Indica qué zona falta, en lugar de un bloqueo genérico.
-                for etiqueta, indices in [('cabeza',[0]),('hombros',[11,12]),('caderas',[23,24]),('rodillas',[25,26]),('pies',[27,28,31,32])]:
+                for etiqueta, indices in [('cabeza',[0]),('hombros',[11,12]),('caderas',[23,24]),('rodillas',[25,26]),('tobillos',[27,28])]:
                     if any((puntos[i].visibility or 0) <= .45 or not (.005 < puntos[i].x < .995 and .005 < puntos[i].y < .995) for i in indices):
                         faltantes.append(etiqueta)
                 mensaje = 'Falta ver: '+', '.join(faltantes)+'. Alejá el celular y evitá contraluz.'
             if valido:
-                altura = max(puntos[31].y,puntos[32].y) - puntos[0].y  # Escala del cuerpo.
-                salto, mensaje = self.salto.evaluar((puntos[23].y+puntos[24].y)/2, puntos[31].y, puntos[32].y, altura, time.monotonic())
+                altura = max(puntos[27].y,puntos[28].y) - puntos[0].y  # Escala desde la cabeza a los tobillos.
+                if altura > .15:  # Evita usar una escala degenerada y falsos saltos.
+                    salto, mensaje = self.salto.evaluar((puntos[23].y+puntos[24].y)/2, puntos[27].y, puntos[28].y, altura, time.monotonic())
+                else:
+                    valido = False
+                    mensaje = 'Alejate: necesito ver cabeza y tobillos completos'
+        if not valido:
+            self.salto.perdida(time.monotonic())  # No reutiliza calibración después de perder el seguimiento.
         listo = valido and self.salto.base is not None  # La partida espera calibración completa.
         # Retorna coordenadas pequeñas: nunca recodifica ni devuelve video HD.
         articulaciones = []

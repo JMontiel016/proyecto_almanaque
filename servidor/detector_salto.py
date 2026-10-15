@@ -15,6 +15,12 @@ class DetectorSalto:
         self.muestras.clear()  # Elimina referencias anteriores.
         self.base, self.en_aire = None, False  # Vuelve a calibrar.
 
+    def perdida(self, ahora):
+        """Descarta la calibración al perder el cuerpo durante más de 1,5 s."""
+        if self.ultimo_valido and ahora - self.ultimo_valido > 1.5:
+            self.reiniciar()
+            self.ultimo_valido = 0.0
+
     def evaluar(self, cadera, pie_izquierdo, pie_derecho, altura, ahora):
         if self.ultimo_valido and ahora - self.ultimo_valido > 1.5:
             self.reiniciar()  # No reutiliza calibración tras moverse fuera del cuadro.

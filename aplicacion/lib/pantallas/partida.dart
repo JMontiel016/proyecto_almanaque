@@ -215,18 +215,20 @@ class _EstadoPartida extends State<Partida> with WidgetsBindingObserver {
 class Esqueleto extends CustomPainter {
   final List puntos; // Coordenadas normalizadas inferidas por Python.
   Esqueleto(this.puntos);
-  static const uniones = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],
-    [23,24],[23,25],[25,27],[24,26],[26,28],[27,31],[28,32]];
+  static const uniones = [[11,12],[11,23],[12,24],[23,24],
+    [23,25],[25,27],[24,26],[26,28]];
+  // Solo articulaciones esenciales para la mecánica y la orientación del usuario.
+  static const marcadores = [11,12,23,24,25,26,27,28];
   @override
   void paint(Canvas canvas, Size size) {
-    if (puntos.length != 33) return;
+    if (puntos.length < 33) return;
     Offset posicion(int i) => Offset((puntos[i][0] as num).toDouble() * size.width, (puntos[i][1] as num).toDouble() * size.height);
     final trazo = Paint()..color = const Color(0xFFA7EF5B)..strokeWidth = 2.5;
     for (final par in uniones) {
       if ((puntos[par[0]][2] as num) > .45 && (puntos[par[1]][2] as num) > .45) canvas.drawLine(posicion(par[0]), posicion(par[1]), trazo);
     }
     trazo.color = const Color(0xFFFFC66B);
-    for (var i = 0; i < puntos.length; i++) { if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3, trazo); }
+    for (final i in marcadores) { if ((puntos[i][2] as num) > .45) canvas.drawCircle(posicion(i), 3.5, trazo); }
   }
   @override
   bool shouldRepaint(covariant Esqueleto anterior) => !identical(puntos, anterior.puntos);
