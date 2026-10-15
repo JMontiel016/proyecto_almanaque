@@ -213,14 +213,22 @@ class _Paisaje extends CustomPainter {
 
     _texto(canvas, 'ZUNPI RUN', const Offset(12, 9), 12, Colors.white70, peso: FontWeight.bold);
     final fase = estado['estado'];
-    if (fase == 'cuenta') _texto(canvas, '${_numero(estado['cuenta']).ceil()}',
-        Offset(size.width * .47, size.height * .31), 47, Colors.white);
-    if (fase == 'espera' || estado.isEmpty) _texto(canvas, 'Prepará tu cámara',
-        Offset(size.width * .24, size.height * .52), 16, Colors.white);
-    if (estado['pausada'] == true && fase == 'jugando') _texto(canvas,
-        'Pausa: falta un cuerpo visible', Offset(12, suelo - 100), 13, Colors.amber);
-    if (fase == 'terminada') _texto(canvas, 'Ronda terminada',
-        Offset(size.width * .25, size.height * .42), 20, Colors.white);
+    if (fase == 'cuenta') {
+      _texto(canvas, '${_numero(estado['cuenta']).ceil()}',
+          Offset(size.width * .47, size.height * .31), 47, Colors.white);
+    }
+    if (fase == 'espera' || estado.isEmpty) {
+      _texto(canvas, 'Prepará tu cámara',
+          Offset(size.width * .24, size.height * .52), 16, Colors.white);
+    }
+    if (estado['pausada'] == true && fase == 'jugando') {
+      _texto(canvas, 'Pausa: falta un cuerpo visible',
+          Offset(12, suelo - 100), 13, Colors.amber);
+    }
+    if (fase == 'terminada') {
+      _texto(canvas, 'Ronda terminada',
+          Offset(size.width * .25, size.height * .42), 20, Colors.white);
+    }
   }
 
   @override
