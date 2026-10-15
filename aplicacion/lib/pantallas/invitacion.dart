@@ -123,9 +123,11 @@ class _EstadoInvitacion extends State<Invitacion> {
             items: opciones.map((url) => DropdownMenuItem(
               value: url, child: Text(Uri.parse(url).host))).toList(),
             onChanged: (url) {
-              if (url != null) setState(() {
-                destino = url; direccion.text = url; aviso = '';
-              });
+              if (url != null) {
+                setState(() {
+                  destino = url; direccion.text = url; aviso = '';
+                });
+              }
             },
           ),
           const SizedBox(height: 16),
