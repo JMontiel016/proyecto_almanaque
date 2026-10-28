@@ -1,0 +1,8 @@
+{
+    // Activar .venv automaticamente en terminales de VS Code
+    "python.defaultInterpreterPath": "${workspaceFolder}/servidor/.venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": true,
+
+    // Permitir tareas automaticas al abrir el workspace
+    "task.allowAutomaticTasks": "on"
+}

@@ -29,6 +29,7 @@ class Sala:
     recorrido: float = 0.0  # Distancia acumulada para animar el terreno.
     siguiente: float = 700.0  # Distancia hasta generar otro obstáculo.
     pausada: bool = False  # Pausa compartida cuando falta seguimiento corporal.
+    pausa_manual: bool = False  # Pausa activada por botón físico del ESP32.
     azar: random.Random = field(default_factory=random.Random)  # Generador de cada sala.
 
     def comenzar(self, solicitante):
@@ -42,14 +43,32 @@ class Sala:
         self.estado, self.tiempo, self.cuenta = 'cuenta', 0.0, 3.0  # Reinicia el reloj.
         self.obstaculos, self.recorrido, self.siguiente = [], 0.0, 700.0  # Limpia recorrido.
         self.azar.seed(random.SystemRandom().randrange(2**32))  # Nueva ronda compartida.
+        self.pausa_manual = False  # Limpia pausa manual de una ronda anterior.
         for jugador in self.jugadores.values():
             jugador.altura = jugador.impulso = 0.0  # Coloca cada dinosaurio en tierra.
             jugador.puntos, jugador.vivo, jugador.guardado = 0, True, False  # Una vida.
 
+    def pausar_manual(self):
+        """Alterna pausa manual desde el botón físico del ESP32."""
+        if self.estado not in ('cuenta', 'jugando'):
+            raise ValueError('No hay ronda activa para pausar.')
+        self.pausa_manual = not self.pausa_manual  # Conmuta sin afectar la pausa automática.
+
+    def resetear(self):
+        """Vuelve la sala a espera desde el botón RESET del ESP32."""
+        self.estado = 'espera'  # Cancela cuenta o ronda en curso.
+        self.tiempo, self.cuenta = 0.0, 3.0  # Reinicia relojes.
+        self.obstaculos, self.recorrido, self.siguiente = [], 0.0, 700.0  # Limpia recorrido.
+        self.pausa_manual = False  # Limpia pausa manual.
+        for jugador in self.jugadores.values():
+            jugador.altura = jugador.impulso = 0.0  # Dinosaurios al suelo.
+            jugador.puntos, jugador.vivo, jugador.guardado = 0, True, False  # Una vida.
+            jugador.listo = False  # Requiere nueva confirmación.
+
     def saltar(self, identificador):
         """Un evento corporal no permite dobles saltos ni revivir."""
         jugador = self.jugadores.get(identificador)  # Busca al dueño de la cámara.
-        if jugador and self.estado == 'jugando' and not self.pausada and jugador.vivo and jugador.altura <= 0:
+        if jugador and self.estado == 'jugando' and not self.pausada and not self.pausa_manual and jugador.vivo and jugador.altura <= 0:
             jugador.impulso = 540.0  # Impulso inicial, compensado por gravedad.
 
     def avanzar(self, segundos, ahora=None):
@@ -58,8 +77,8 @@ class Sala:
         dt = min(max(segundos, 0.0), 0.05)  # Limita saltos temporales del servidor.
         activos = [j for j in self.jugadores.values() if j.vivo and j.conectado]  # Participantes.
         self.pausada = any(not j.rastreado or ahora - j.ultima_camara > 1.5 for j in activos)
-        if self.estado not in ('cuenta', 'jugando') or self.pausada:
-            return []  # Sin puntos gratis durante pausas o fuera de una ronda.
+        if self.estado not in ('cuenta', 'jugando') or self.pausada or self.pausa_manual:
+            return []  # Sin puntos gratis durante pausas (automática o manual) o fuera de ronda.
         if self.estado == 'cuenta':
             self.cuenta -= dt  # Todos observan la misma cuenta.
             if self.cuenta <= 0:
@@ -98,7 +117,7 @@ class Sala:
     def publico(self):
         """Estado pequeño que comparten todos los celulares y la OLED."""
         return {'tipo': 'estado', 'sala': self.codigo, 'administrador': self.administrador,
-                'estado': self.estado, 'cuenta': max(0, self.cuenta), 'pausada': self.pausada,
+                'estado': self.estado, 'cuenta': max(0, self.cuenta), 'pausada': self.pausada or self.pausa_manual,
                 'recorrido': self.recorrido, 'velocidad': min(1.5 ** min(int(self.tiempo * 25) // 500, 4), 4.0),
                 'obstaculos': self.obstaculos,
                 'jugadores': [{k:v for k,v in vars(j).items() if k not in ('identificador_privado','ultima_camara')} for j in self.jugadores.values()]}

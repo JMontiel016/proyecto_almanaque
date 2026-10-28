@@ -138,9 +138,42 @@ async def obtener_ranking():
 async def obtener_oled(codigo: str):
     sala = salas.get(codigo.upper())  # Consulta de solo lectura para ESP32.
     if not sala:
-        return {'estado':'sin sala','jugadores':[]}  # OLED no necesita iniciar sesión.
+        return {'estado':'sin sala','pausada':False,'jugadores':[]}  # OLED no necesita iniciar sesión.
     jugadores = sorted(sala.jugadores.values(), key=lambda j:j.puntos, reverse=True)  # Orden por puntos.
-    return {'estado':sala.estado,'jugadores':[{'nombre':j.nombre,'puntos':j.puntos} for j in jugadores]}
+    return {'estado':sala.estado,'pausada':sala.pausada or sala.pausa_manual,'jugadores':[{'nombre':j.nombre,'puntos':j.puntos} for j in jugadores]}
+
+@app.post('/control/{codigo}/iniciar')
+async def control_iniciar(codigo: str):
+    """Inicia la ronda desde el botón START del ESP32."""
+    sala = salas.get(codigo.upper())
+    if not sala:
+        return {'error':'La sala no existe o ya terminó su sesión.'}
+    try:
+        sala.comenzar(sala.administrador)  # El ESP32 actúa como administrador.
+        return {'estado':sala.estado}
+    except ValueError as e:
+        return {'error':str(e)}
+
+@app.post('/control/{codigo}/pausar')
+async def control_pausar(codigo: str):
+    """Alterna pausa manual desde el botón START/PAUSE del ESP32."""
+    sala = salas.get(codigo.upper())
+    if not sala:
+        return {'error':'La sala no existe o ya terminó su sesión.'}
+    try:
+        sala.pausar_manual()
+        return {'estado':sala.estado,'pausa_manual':sala.pausa_manual}
+    except ValueError as e:
+        return {'error':str(e)}
+
+@app.post('/control/{codigo}/reset')
+async def control_reset(codigo: str):
+    """Resetea la sala desde el botón RESET del ESP32."""
+    sala = salas.get(codigo.upper())
+    if not sala:
+        return {'error':'La sala no existe o ya terminó su sesión.'}
+    sala.resetear()
+    return {'estado':sala.estado}
 
 @app.websocket('/conexion')
 async def conectar(websocket: WebSocket):
